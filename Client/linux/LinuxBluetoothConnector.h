@@ -7,7 +7,7 @@
 class LinuxBluetoothConnector final : public IBluetoothConnector
 {
 public:
-	LinuxBluetoothConnector();
+	explicit LinuxBluetoothConnector(bool verbose = false);
 	~LinuxBluetoothConnector();
 	virtual void connect(const std::string& addrStr) noexcept(false);
 	virtual int send(char* buf, size_t length) noexcept(false);
@@ -18,6 +18,7 @@ public:
 
 
 private:
+	bool _verbose;
 	int _socket = -1;
 	std::atomic<bool> _connected = false;
 };

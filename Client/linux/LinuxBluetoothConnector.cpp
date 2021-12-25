@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdio>
+#include <iomanip>
 #include <iostream>
 #include <stdio.h>
 #include <unistd.h>
@@ -16,9 +17,11 @@
 
 #include "DBusHelper.h"
 
-LinuxBluetoothConnector::LinuxBluetoothConnector()
+LinuxBluetoothConnector::LinuxBluetoothConnector(bool verbose)
+    : _verbose(verbose)
 {
 }
+
 LinuxBluetoothConnector::~LinuxBluetoothConnector()
 {
   //onclose event
@@ -31,12 +34,18 @@ LinuxBluetoothConnector::~LinuxBluetoothConnector()
 int LinuxBluetoothConnector::recv(char *buf, size_t length)
 {
   size_t read = ::read(this->_socket, buf, length);
-  // printf("length: %ld, read: %ld\n", length, read);
-  // for (int i = 0; i < read; i++)
-  // {
-  //   std::cout << std::setfill('0') << std::setw(2) << std::hex << (0xff & (unsigned int)buf[i]) << " ";
-  // }
-  // std::cout << '\n';
+
+  if (this->_verbose)
+  {
+    printf("length: %ld, read: %ld\n", length, read);
+    for (int i = 0; i < read; i++)
+    {
+        std::cout << std::setfill('0') << std::setw(2) << std::hex
+                  << (unsigned int)(unsigned char)buf[i] << ' ';
+    }
+    std::cout << '\n' << std::dec;
+  }
+
   return read;
 }
 
@@ -44,19 +53,28 @@ int LinuxBluetoothConnector::send(char *buf, size_t length)
 {
 
   size_t written = ::write(this->_socket, buf, length);
-  // printf("length: %ld, written: %ld\n", length, written);
-  // for (int i = 0; i < written; i++)
-  // {
-  //   std::cout << std::setfill('0') << std::setw(2) << std::hex << (0xff & (unsigned int)buf[i]) << " ";
-  // }
-  // std::cout << '\n';
+
+  if (this->_verbose)
+  {
+    printf("length: %ld, written: %ld\n", length, written);
+    for (int i = 0; i < written; i++)
+    {
+      std::cout << std::setfill('0') << std::setw(2) << std::hex
+                << (unsigned int)(unsigned char)buf[i] << ' ';
+    }
+    std::cout << '\n' << std::dec;
+  }
+
   return written;
 }
 
 void LinuxBluetoothConnector::connect(const std::string &addrStr)
 {
+  if (this->_verbose)
+  {
+    printf("connecting to %s\n", addrStr.c_str());
+  }
 
-  printf("connecting to %s\n", addrStr.c_str());
   struct sockaddr_rc addr = {0};
   int status;
   const char *dest = addrStr.c_str();
@@ -68,10 +86,14 @@ void LinuxBluetoothConnector::connect(const std::string &addrStr)
   int sl = sizeof(linkmode);
   setsockopt(this->_socket, SOL_RFCOMM, RFCOMM_LM, &linkmode, sl);
 
+  uint8_t channel = sdp_getServiceChannel(addrStr.c_str(), SERVICE_UUID_IN_BYTES);
+  if (this->_verbose)
+  {
+    printf("channel: %d\n", channel);
+  }
+
   // set the connection parameters (who to connect to)
   addr.rc_family = AF_BLUETOOTH;
-  uint8_t channel = sdp_getServiceChannel(addrStr.c_str(), SERVICE_UUID_IN_BYTES);
-  printf("channel: %d\n", channel);
   addr.rc_channel = channel;
   str2ba(dest, &addr.rc_bdaddr);
 
@@ -99,7 +121,11 @@ std::vector<BluetoothDevice> LinuxBluetoothConnector::getConnectedDevices()
   std::vector<std::string> adapter_paths = dbus_list_adapters(connection);
   for (auto &adapter : adapter_paths)
   {
-    printf("%s\n", adapter.c_str());
+    if (this->_verbose)
+    {
+      printf("%s\n", adapter.c_str());
+    }
+
     std::string name = dbus_get_property(connection, adapter.c_str(), "Name");
     std::string address = dbus_get_property(connection, adapter.c_str(), "Address");
     res.push_back({.name = name, .mac = address});
@@ -116,7 +142,11 @@ void LinuxBluetoothConnector::disconnect() noexcept
     ::close(this->_socket);
   }
   this->_connected = false;
-  printf("closed\n");
+
+  if (this->_verbose)
+  {
+    printf("closed\n");
+  }
 }
 
 bool LinuxBluetoothConnector::isConnected() noexcept
