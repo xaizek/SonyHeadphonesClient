@@ -5,6 +5,7 @@
 #include <iomanip>
 #include <iostream>
 #include <stdio.h>
+#include <cerrno>
 #include <unistd.h>
 
 #include <string.h>
@@ -33,7 +34,12 @@ LinuxBluetoothConnector::~LinuxBluetoothConnector()
 
 int LinuxBluetoothConnector::recv(char *buf, size_t length)
 {
-  size_t read = ::read(this->_socket, buf, length);
+  ssize_t read = ::read(this->_socket, buf, length);
+  if (read < 0)
+  {
+    auto error = "Bluetooth read error: " + std::string(strerror(errno));
+    throw RecoverableException(error, true);
+  }
 
   if (this->_verbose)
   {
